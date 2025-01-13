@@ -2,7 +2,7 @@
 #                    TE density in gene features                      #
 #---------------------------------------------------------------------#
 # Author: Guillermo Peris                                             #
-# Version: 08/01/2025                                                 #
+# Version: 13/01/2025                                                 #
 # Function: Computes number or density of transposable elements in    #
 #           gene features (5'UTR, exons, introns...)                  #
 #######################################################################
@@ -16,6 +16,8 @@ library(AnnotationHub)
 library(UCSCRepeatMasker)
 library(biomartr)
 library(BRGenomics)
+library(data.table)
+library(tools)
 source("scripts/auxiliaryFunctions.R")
 #---------------------------------------------------------------------#
 
@@ -23,16 +25,16 @@ source("scripts/auxiliaryFunctions.R")
 #-------------- Parameters (you should modify it! ) ------------------#
 #---------------------------------------------------------------------#
 #--- Organism: "Homo sapiens", "Mus musculus", "Danio rerio"
-organism <- "Homo sapiens"
+organism <- "Felis catus"  
 
 #--- UCSC_TE_annot is record ID for RepeatMasker in Annotation Hub
 #--- It depends on organism and assembly
 #--- To search your interest ID, run script checkAnnotations.R
-UCSC_TE_annot <- "AH111333"   # hg38 human
+UCSC_TE_annot <- "AH98994"   
 
 # Gene annotation release for ensembl
 # Find here: https://www.ensembl.org/info/website/archives/assembly.html  
-release <- "113" # hg38
+release <- "113" 
 
 #--- interest_TEs: TE families to select. NULL for all TEs. 
 interest_TEs <- c("LINE", "LTR", "DNA", "SINE")
@@ -46,8 +48,8 @@ interest_subF <- NULL
 #--- tag specifies filtering on gene annotation.
 #--- Is important to filter spurious annotations
 #--- values: NULL (no filter). For other values, run script checkAnnotations.R
-tag <- "Ensembl_canonical" 
-# tag <- NULL
+tag <- "Ensembl_canonical"  
+# tag <- NULL    
 
 #--- minOverlap: default 1E-9. 
 # 50 means only consider TEs that overlap at least 50 bp.
@@ -58,7 +60,7 @@ minOverlap <- 50
 downstream <- 5000
 
 #--- Relative path to output dir. "" for script folder.
-OUTPUT_DIR <- "" 
+OUTPUT_DIR <- "results/"  
 
 #--- analysis: "density" (default) or "number" (number of overlapping TEs)
 analysis <- "number"
@@ -70,21 +72,21 @@ analysis <- "number"
 #---------------------------------------------------------------------#
 
 #--- fileGene: TRUE for file read, FALSE for file import from ensembl.
-fileGene <- FALSE
+fileGene <- FALSE    
 # if TRUE, gene_annot_file is absolute path to gff annotation
 if(fileGene) {
-  gene_annot_file  <- "lib/Homo_sapiens.GRCh38.110_chr.gtf"  
+  gene_annot_file  <- "data/Felis_catus.Felis_catus_9.0.113.gtf"  
 } 
 # Specify gene_annot_format. Use "gff" for ensembl import.
 gene_annot_format <- "gff"
 
 #--- fileTE: TRUE for file read, FALSE for file import from repeatMasker.
-fileTE <- FALSE
+fileTE <- FALSE      
 # if TRUE, TE_annot_file is absolute path to annotation.
 if(fileTE) {
-  TE_annot_file <- "lib/hg38_all.bed"
+  TE_annot_file <- "data/cat_rmsk.txt"
   # Specify TE_annot_format
-  TE_annot_format <- "bed"
+  TE_annot_format <- "rmsk"
 }
 
 #--- feature_types 
@@ -130,6 +132,10 @@ if(!fileTE) {
   TE_annot <- ah[[UCSC_TE_annot]]
   TE_annot <- process_ensembl_rm(TE_annot)
 } else {
+  if(TE_annot_format == "rmsk") {
+    TE_annot_file <- process_rmsk_file(TE_annot_file)
+    TE_annot_format <- "bed"
+  }
   TE_annot <- import(TE_annot_file, format=TE_annot_format)
   TE_annot <- process_file_rm(TE_annot)
 }
@@ -160,7 +166,6 @@ TE_annot_reduced <- sort(TE_annot_reduced, ignore.strand = TRUE)
 
 # We save merged TE IDs.
 if(analysis == "density") {
-#--- (Idea from https://bioconductor.org/packages/devel/bioc/vignettes/GenomicRanges/inst/doc/Ten_things_slides.pdf)
 revmap <- mcols(TE_annot_reduced)$revmap
 mcols(TE_annot_reduced)[, c("name", "TE_name", "subfamily", "family")] <- 
     DataFrame(name = paste(extractList(mcols(TE_annot)$name, revmap), collapse=";"),
@@ -311,7 +316,7 @@ for (feature_type in feature_types) {
   }
   
   #--- Save csv
-  write.table(overlap_by_gene, file=outputFile, sep="\t", quote = FALSE, row.names = FALSE , dec = ",")
+  fwrite(overlap_by_gene, file=outputFile, sep="\t", quote = FALSE, row.names = FALSE , dec = ",")
 }
 
 if(!fileGene) {
@@ -328,7 +333,7 @@ if(analysis == "density") {
 }
 feature_type <- feature_types[1]
 file <- paste0(OUTPUT_DIR, "TE_", analysis, "_", feature_type, ".csv")
-TE_table <- read.table(file, sep="\t", dec = ",", header = TRUE )
+TE_table <- as.data.frame(fread(file, sep="\t", dec = ",", header = TRUE ))
 TE_table_final <- TE_table[, c("gene_id", "gene_name", my.variable)]
 colnames(TE_table_final) <- c("gene_id", "gene_name", paste0(feature_type, "_", my.variable))  
 #---
@@ -336,7 +341,7 @@ colnames(TE_table_final) <- c("gene_id", "gene_name", paste0(feature_type, "_", 
 
 for (feature_type in feature_types[-1]) {
   file <- paste0(OUTPUT_DIR, "TE_", analysis, "_", feature_type, ".csv")
-  TE_table <- read.table(file, sep="\t", dec = ",", header = TRUE )
+  TE_table <- as.data.frame(fread(file, sep="\t", dec = ",", header = TRUE ))
   TE_table <- TE_table[, c("gene_id", my.variable)] 
   colnames(TE_table) <- c("gene_id", paste0(feature_type, "_", my.variable))  
   TE_table_final <- merge(TE_table_final, TE_table, by.x = "gene_id", all.x = TRUE)
@@ -344,5 +349,5 @@ for (feature_type in feature_types[-1]) {
 
 #--- Change decimals and save csv
 TE_table_final <- TE_table_final %>%  mutate_if(is.numeric, round, digits = 4)
-write.table(TE_table_final, file=outputFile, sep="\t", quote = FALSE, 
+fwrite(TE_table_final, file=outputFile, sep="\t", quote = FALSE, 
             row.names = FALSE , dec = ",", na = "NA")

@@ -2,9 +2,8 @@
 #            Auxiliary functions for TE_in_gene_density.R             #
 #---------------------------------------------------------------------#
 # Author: Guillermo Peris                                             #
-# Version: 08/01/2025                                                 #
+# Version: 13/01/2025                                                 #
 #######################################################################
-library(data.table)
 
 #-----------------------------------------------#
 #--- granges_to_bed: converts GRanges object ---# 
@@ -156,6 +155,9 @@ process_file_rm <- function(TE_annot) {
   newCols <-  reshape2::colsplit(str_replace_all(TE_annot$name, ":", "|"), "\\|", newColNames)
   mcols(TE_annot)[, c("TE_name", "subfamily", "family")] <- newCols[, c("TE_name", "subfamily", "family")]
   
+  # Sort GRange by coordinates (ignore strand)
+  TE_annot <- sort(TE_annot, ignore.strand=TRUE)
+  
   return(TE_annot)
 }
   
@@ -220,7 +222,7 @@ importGtfTag <- function(GTF_file, tag) {
   
   # Convert to line and write to temp file
   tmpFile <- tempfile(pattern = "file", tmpdir = tempdir(), fileext = ".gff")
-  write.table(lines.write, file=tmpFile, sep="\t", quote = FALSE, 
+  fwrite(lines.write, file=tmpFile, sep="\t", quote = FALSE, 
               col.names = FALSE, row.names = FALSE)
   
   # Read tmpFile as GTF
@@ -233,4 +235,39 @@ importGtfTag <- function(GTF_file, tag) {
   out <- file.remove(tmpFile)
   
   return(tmp_annot)
+}
+
+#-----------------------------------------------#
+#--- process_rmsk_file: processes            ---#
+#--- RepeatMasker file downloaded from UCSC  ---# 
+#--- with rmsk format                        ---#
+#-----------------------------------------------#
+process_rmsk_file <- function(TE_annot_file){
+  TE_table <- fread(TE_annot_file, sep="\t", dec = ",", header = TRUE )
+  
+  # Remove uninteresting repeats (same filter as SQuIRE).
+  TE_table <- TE_table[!(TE_table$repClass %in% 
+                           c("Simple_repeat", "Satellite", "Unknown", "Low_complexity")), ]
+  
+  
+  TE_new_table <- data.frame(chr = TE_table$genoName,
+                             start = TE_table$genoStart,
+                             end = TE_table$genoEnd,
+                             name = paste0(TE_table$genoName,  "|",
+                                           TE_table$genoStart, "|",
+                                           TE_table$genoEnd,   "|",
+                                           TE_table$repName,   ":",
+                                           TE_table$repFamily,  ":",
+                                           TE_table$repClass, "|",
+                                           TE_table$milliDiv,  "|",
+                                           TE_table$strand),
+                             score = TE_table$swScore,
+                             strand = TE_table$strand   
+)
+  
+  # outputFile
+  outputFile <- paste0(file_path_sans_ext(TE_annot_file), ".bed")
+  fwrite(TE_new_table, file=outputFile, sep="\t", quote = FALSE, 
+              col.names = FALSE, row.names = FALSE , dec = ",")
+  return(outputFile)
 }

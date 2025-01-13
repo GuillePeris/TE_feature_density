@@ -2,15 +2,20 @@
 #                          Check annotations                          #
 #---------------------------------------------------------------------#
 # Author: Guillermo Peris                                             #
-# Version: 08/01/2025                                                 #
+# Version: 13/01/2025                                                 #
 #######################################################################
 
 #-------------------------- Parameters--------------------------------#
 #--- Organism: "Homo sapiens", "Mus musculus", "Danio rerio"
-organism <- "Homo sapiens"
+organism <- "Felis catus"
 # Gene annotation release for ensembl
 # Find here: https://www.ensembl.org/info/website/archives/assembly.html  
 release <- "113"
+fileTE <- FALSE
+fileGene <- FALSE
+if(fileGene) {
+  gene_annot_file  <- "data/Felis_catus.Felis_catus_9.0.113.gtf"  
+}
 
 #--------------------- Advanced parameters----------------------------#
 # Number of lines to read.
@@ -23,20 +28,17 @@ library(biomartr)
 library(stringi)
 #---------------------------------------------------------------------#
 
-#---- Check available TE annotations.
-ah <- AnnotationHub()
-TE <- query(ah, c("RepeatMasker", organism))
-#----
-
-#---- Check available filter tags in gene annotation
-gene_annot_file <- getGTF(
-  db = "ensembl",
-  organism = organism,
-  remove_annotation_outliers = FALSE,
-  path = file.path("/tmp"),
-  release = release,
-  mute_citation = TRUE
-)
+if(!fileGene) {
+  #---- Check available filter tags in gene annotation
+  gene_annot_file <- getGTF(
+    db = "ensembl",
+    organism = organism,
+    remove_annotation_outliers = FALSE,
+    path = file.path("/tmp"),
+    release = release,
+    mute_citation = TRUE
+  )
+}
 
 # Read file skipping #
 lines <- readLines(gene_annot_file, n = maximalNumberOfLines)
@@ -55,7 +57,16 @@ extractTags <- function(line) {
 tags <- lapply(lines[1:10], function(x) extractTags(x))
 uniqueTags <- unique(unlist(tags))
 
-#------- Output
-cat("RepeatMasker annotation: ")
-TE
+
+if(!fileTE) {
+  #---- Check available TE annotations.
+  ah <- AnnotationHub()
+  TE <- query(ah, c("RepeatMasker", organism))
+  #----
+  
+  #------- Output
+  cat("RepeatMasker annotation: ")
+  TE
+}
+
 cat(paste0("Feature filters: NULL ", uniqueTags))
