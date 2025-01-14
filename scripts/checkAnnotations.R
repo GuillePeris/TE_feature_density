@@ -7,7 +7,7 @@
 
 #-------------------------- Parameters--------------------------------#
 #--- Organism: "Homo sapiens", "Mus musculus", "Danio rerio"
-organism <- "Felis catus"
+organism <- "Homo sapiens"
 # Gene annotation release for ensembl
 # Find here: https://www.ensembl.org/info/website/archives/assembly.html  
 release <- "113"
@@ -54,7 +54,7 @@ extractTags <- function(line) {
   tags
 }
 
-tags <- lapply(lines[1:10], function(x) extractTags(x))
+tags <- lapply(lines, function(x) extractTags(x))
 uniqueTags <- unique(unlist(tags))
 
 
@@ -69,4 +69,4 @@ if(!fileTE) {
   TE
 }
 
-cat(paste0("Feature filters: NULL ", uniqueTags))
+cat(paste0("Feature filters: NULL ", paste(uniqueTags, collapse = " ")))
