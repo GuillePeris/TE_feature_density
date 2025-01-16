@@ -9,7 +9,6 @@ A script for computing density or number of transposable elements (TEs) in prote
   * reshape2
   * bedtoolsr
   * AnnotationHub
-  ###* BRGenomics
   * rtracklayer
   * biomartr
   * UCSCRepeatMasker
