@@ -7,15 +7,16 @@ A script for computing density or number of transposable elements (TEs) in prote
   * dplyr
   * stringr
   * reshape2
-  * bedr
+  * bedtoolsr
   * AnnotationHub
-  * BRGenomics
+  ###* BRGenomics
+  * rtracklayer
   * biomartr
   * UCSCRepeatMasker
   * data.table
   * tools
 
-`bedr` is an R package that uses internally `bedtools` so [this package](https://bedtools.readthedocs.io/en/latest/) has to be installed previously.
+`bedtoolsr` is an R package that uses internally `bedtools` so [this package](https://bedtools.readthedocs.io/en/latest/) has to be installed previously.
 
 **TE_feature_density** has only been tested in Unix/Linux.
 

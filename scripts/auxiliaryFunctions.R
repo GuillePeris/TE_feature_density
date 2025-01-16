@@ -65,7 +65,10 @@ downstreamProcessing <- function(three_prime, downstream) {
     start(three_prime[strand(three_prime) == "-"])   -  1
   start(three_prime[strand(three_prime) == "-"])   <- 
     start(three_prime[strand(three_prime) == "-"])   -  downstream
-  gene_annot_bed <- bedr.sort.region(granges_to_bed(three_prime))
+  gene_annot_bed <- granges_to_bed(three_prime)
+  cols <- colnames(gene_annot_bed)
+  gene_annot_bed <- bedtoolsr::bt.sort(gene_annot_bed) 
+  colnames(gene_annot_bed) <- cols
   return(gene_annot_bed)
 }
 
@@ -115,8 +118,11 @@ intronsFromGFF <- function(gff) {
   genes <- gff[gff$type == "gene", ]
   genes <- sort(genes, ignore.strand=TRUE)
   genes_bed <- granges_to_bed(genes)
-  genes_bed <- genes_bed[,c("chr", "start", "end", "gene_id")]
-  genes_bed <- bedr.sort.region(genes_bed)
+  my.colnames <- c("chr", "start", "end", "gene_id")
+  genes_bed <- genes_bed[, my.colnames]
+  genes_bed <- bedtoolsr::bt.sort(genes_bed)
+  colnames(genes_bed) <- my.colnames
+  
   
   #--- Get protein_coding exons and reduce by gene
   exons <- gff[gff$type == "exon", ] 
@@ -125,17 +131,17 @@ intronsFromGFF <- function(gff) {
   #--- Remove 1bp features
   exons_reduced <- exons_reduced[width(exons_reduced) > 1, ]
   exons_bed <- granges_to_bed(exons_reduced)
-  exons_bed <- bedr.sort.region(exons_bed)
+  exons.cols <- colnames(exons_bed)
+  exons_bed <- bedtoolsr::bt.sort(exons_bed)
+  colnames(exons_bed) <- exons.cols
   
   #--- Getting introns by substracting exons from genes
-  complement <- bedr(
-    input = list(a = genes_bed, b = exons_bed), 
-    method = "subtract",
-    params = "-sorted"
-  )
-  
-  complement <- bedr.sort.region(complement)
-  
+  complement <- bedtoolsr::bt.subtract(genes_bed, exons_bed)
+
+  # complement <- bedr.sort.region(complement)
+  complement <- bedtoolsr::bt.sort(complement) 
+  colnames(complement) <- colnames(genes_bed)
+
   #--- We need to assign an arbitrary name to intron.
   complement$feature_id <- paste0("intron_", seq(1:nrow(complement)))
   return(complement) 
@@ -174,7 +180,7 @@ process_ensembl_rm <- function(TE_annot) {
   TE_annot <- TE_annot[!(TE_annot$repClass %in% 
                            c("Simple_repeat", "Satellite", "Unknown", "Low_complexity")), ]
   
-  # Sort GRange by coordinates (ignore strand)
+  # Sort GRanges by coordinates (ignore strand)
   TE_annot <- sort(TE_annot, ignore.strand=TRUE)
   
   # Add metacols

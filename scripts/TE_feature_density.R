@@ -2,13 +2,13 @@
 #                    TE density in gene features                      #
 #---------------------------------------------------------------------#
 # Author: Guillermo Peris                                             #
-# Version: 13/01/2025                                                 #
+# Version: 16/01/2025                                                 #
 # Function: Computes number or density of transposable elements in    #
 #           gene features (5'UTR, exons, introns...)                  #
 #######################################################################
 
 #-------------------------- Libraries --------------------------------#
-library(bedr)
+library(bedtoolsr)
 library(reshape2)
 library(stringr)
 library(dplyr)
@@ -16,6 +16,7 @@ library(AnnotationHub)
 library(UCSCRepeatMasker)
 library(biomartr)
 library(BRGenomics)
+library(rtracklayer)
 library(data.table)
 library(tools)
 source("scripts/auxiliaryFunctions.R")
@@ -63,7 +64,7 @@ downstream <- 5000
 OUTPUT_DIR <- "results/"  
 
 #--- analysis: "density" (default) or "number" (number of overlapping TEs)
-analysis <- "number"
+analysis <- "density"
 #---------------------------------------------------------------------#
 
 
@@ -174,10 +175,13 @@ mcols(TE_annot_reduced)[, c("name", "TE_name", "subfamily", "family")] <-
               family = paste(extractList(mcols(TE_annot)$family, revmap), collapse=";"))
 mcols(TE_annot_reduced)$revmap <- NULL
 }
-
-TE_annot_bed <- bedr.sort.region(granges_to_bed(TE_annot_reduced)) 
-TE_annot_bed <- TE_annot_bed %>% 
-  dplyr::rename(chrTE=chr, 
+# TE_annot_bed <- bedr.sort.region(granges_to_bed(TE_annot_reduced)) 
+TE_annot_bed <- granges_to_bed(TE_annot_reduced)
+my.colnames <- colnames(TE_annot_bed)
+TE_annot_bed <- bedtoolsr::bt.sort(TE_annot_bed) 
+colnames(TE_annot_bed) <- my.colnames
+TE_annot_bed <- TE_annot_bed %>%
+  dplyr::rename(chrTE=chr,
          startTE=start,
          endTE = end,
          strandTE = strand)
@@ -201,7 +205,11 @@ for (feature_type in feature_types) {
   #--- Other features.
   } else {
     gene_annot_reduced <- annotationProcessing(gene_annot, feature_type) 
-    gene_annot_bed <- bedr.sort.region(granges_to_bed(gene_annot_reduced))
+    # gene_annot_bed <- bedr.sort.region(granges_to_bed(gene_annot_reduced))
+    gene_annot_bed <- granges_to_bed(gene_annot_reduced)
+    my.colnames <- colnames(gene_annot_bed)
+    gene_annot_bed <-bedtoolsr::bt.sort(gene_annot_bed)
+    colnames(gene_annot_bed) <-my.colnames
   }
   gene_annot_bed$gene_width = abs(gene_annot_bed$end - gene_annot_bed$start)
   #---------------------------------------------------------------------#
@@ -212,14 +220,12 @@ for (feature_type in feature_types) {
   #---------------------------------------------------------------------#
   
   #--- Compute overlap.
-  overlap <- bedr(
-    input = list(a = gene_annot_bed, b = TE_annot_bed), 
-    method = "intersect", 
-    # -wao:  show amount of overlap (even for gene entries though no intersecting TEs)
-    # -sorted: assumes inputs are sorted, so that algorithm is faster.
-    params = "-wao -sorted")
-  
-  names(overlap)[ncol(overlap)] <- "width"
+  gene.cols <- colnames(gene_annot_bed)
+  TE.cols <- colnames(TE_annot_bed)
+  overlap <- bedtoolsr::bt.intersect(
+    gene_annot_bed, TE_annot_bed, wao="-wao", sorted="-sorted"
+  )
+  colnames(overlap) <- c(gene.cols, TE.cols, "width")
   overlap$gene_width <- as.numeric(overlap$gene_width)
   
   #--- Filter TE clusters with overlapping width under minOverlap bp 
